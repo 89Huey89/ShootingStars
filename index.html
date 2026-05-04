@@ -208,6 +208,57 @@
     background: linear-gradient(135deg, #7ee787, #3aa07c);
     color: #04210f;
   }
+
+  #nameInput {
+    margin-top: 16px;
+    padding: 14px 22px;
+    font-size: clamp(18px, 5vw, 22px);
+    border: none;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    text-align: center;
+    outline: none;
+    width: min(320px, 88vw);
+    box-shadow: inset 0 0 0 2px rgba(255,226,122,0.4);
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: manipulation;
+  }
+  #nameInput::placeholder { color: rgba(255,255,255,0.4); }
+  #nameInput:focus { box-shadow: inset 0 0 0 2px #ffe27a; background: rgba(255,255,255,0.18); }
+
+  .overlay { overflow-y: auto; }
+
+  #highScoreList {
+    width: min(340px, 90vw);
+    margin: 12px 0 4px;
+  }
+  .hs-title {
+    font-size: clamp(12px, 3.2vw, 15px);
+    opacity: 0.65;
+    margin-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .hs-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    border-radius: 12px;
+    font-size: clamp(14px, 3.8vw, 17px);
+    margin-bottom: 5px;
+    background: rgba(255,255,255,0.07);
+  }
+  .hs-row.hs-new {
+    background: rgba(255,226,122,0.2);
+    box-shadow: 0 0 0 1.5px rgba(255,226,122,0.65);
+  }
+  .hs-rank { font-weight: 800; width: 22px; text-align: center; opacity: 0.55; flex-shrink: 0; }
+  .hs-name { flex: 1; font-weight: 600; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hs-score { font-weight: 800; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -226,6 +277,14 @@
   <button id="startBtn" class="btn">Spiel starten</button>
 </div>
 
+<div id="nameScreen" class="overlay hidden">
+  <h1>Wer spielt?</h1>
+  <p>Gib deinen Namen ein, um in der Highscore-Liste zu erscheinen.</p>
+  <input id="nameInput" type="text" placeholder="Dein Name" maxlength="20"
+    autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" inputmode="text" />
+  <button id="nameBtn" class="btn">Los! 🚀</button>
+</div>
+
 <div id="endScreen" class="overlay hidden">
   <div class="unicorn-says">
     <div class="speech-bubble">Komm, versuch's nochmal!</div>
@@ -233,6 +292,7 @@
   </div>
   <h1>Game Over</h1>
   <p id="finalScore">Du hast 0 Sternschnuppen gefangen.</p>
+  <div id="highScoreList"></div>
   <button id="restartBtn" class="btn">Nochmal spielen</button>
 </div>
 
@@ -262,13 +322,53 @@
   const livesEl = document.getElementById('lives');
   const scoreEl = document.getElementById('score');
   const startScreen = document.getElementById('startScreen');
+  const nameScreen = document.getElementById('nameScreen');
+  const nameInput = document.getElementById('nameInput');
+  const nameBtn = document.getElementById('nameBtn');
   const endScreen = document.getElementById('endScreen');
   const startBtn = document.getElementById('startBtn');
   const restartBtn = document.getElementById('restartBtn');
   const finalScore = document.getElementById('finalScore');
+  const highScoreList = document.getElementById('highScoreList');
   const countPanel = document.getElementById('countPanel');
   const countDisplay = document.getElementById('countDisplay');
   const fireTimerEl = document.getElementById('fireTimer');
+
+  const STORAGE_KEY = 'shootingstars_hs';
+  const MAX_SCORES = 10;
+
+  function loadHighScores() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function saveHighScore(name, score) {
+    const scores = loadHighScores();
+    const entry = { name, score, date: new Date().toLocaleDateString('de-DE') };
+    scores.push(entry);
+    scores.sort((a, b) => b.score - a.score);
+    if (scores.length > MAX_SCORES) scores.splice(MAX_SCORES);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(scores));
+    return { scores, newIndex: scores.indexOf(entry) };
+  }
+
+  function escapeHTML(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderHighScores(scores, newIndex) {
+    const top = scores.slice(0, 5);
+    if (top.length === 0) { highScoreList.innerHTML = ''; return; }
+    highScoreList.innerHTML =
+      '<div class="hs-title">🏆 Highscores</div>' +
+      top.map((s, i) =>
+        `<div class="hs-row${i === newIndex ? ' hs-new' : ''}">` +
+        `<span class="hs-rank">${i + 1}.</span>` +
+        `<span class="hs-name">${escapeHTML(s.name)}</span>` +
+        `<span class="hs-score">⭐ ${s.score}</span>` +
+        `</div>`
+      ).join('');
+  }
 
   let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   let W = 0, H = 0;
@@ -293,6 +393,7 @@
 
   const state = {
     running: false,
+    playerName: '',
     lives: 3,
     score: 0,
     items: [],
@@ -356,8 +457,6 @@
 
   function startGame() {
     reset();
-    startScreen.classList.add('hidden');
-    endScreen.classList.add('hidden');
     state.running = true;
     state.lastTime = performance.now();
     requestAnimationFrame(loop);
@@ -365,12 +464,40 @@
 
   function endGame() {
     state.running = false;
-    finalScore.textContent = `Du hast ${state.score} Sternschnuppe${state.score === 1 ? '' : 'n'} gefangen.`;
+    finalScore.textContent = `${state.playerName} hat ${state.score} Sternschnuppe${state.score === 1 ? '' : 'n'} gefangen.`;
+    const { scores, newIndex } = saveHighScore(state.playerName, state.score);
+    renderHighScores(scores, newIndex);
     endScreen.classList.remove('hidden');
   }
 
-  startBtn.addEventListener('click', startGame);
-  restartBtn.addEventListener('click', startGame);
+  function showNameScreen() {
+    nameInput.value = state.playerName;
+    nameScreen.classList.remove('hidden');
+  }
+
+  function confirmName() {
+    const name = nameInput.value.trim();
+    state.playerName = name || 'Anonym';
+    nameScreen.classList.add('hidden');
+    startGame();
+  }
+
+  startBtn.addEventListener('click', () => {
+    startScreen.classList.add('hidden');
+    showNameScreen();
+    nameInput.focus();
+  });
+
+  restartBtn.addEventListener('click', () => {
+    endScreen.classList.add('hidden');
+    showNameScreen();
+    nameInput.focus();
+  });
+
+  nameBtn.addEventListener('click', confirmName);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmName();
+  });
 
   // ITEM TYPES
   // type: 'star' (good) | 'ball' | 'drop' | 'food' (bad)
