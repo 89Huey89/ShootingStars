@@ -238,7 +238,7 @@
     <button class="num-btn" data-digit="9">9</button>
     <button class="num-btn action" id="countClear">←</button>
     <button class="num-btn zero" data-digit="0">0</button>
-    <button class="num-btn ok" id="countOk">OK</button>
+    <button class="num-btn ok" id="countOk">✓</button>
   </div>
 </div>
 
@@ -426,7 +426,7 @@
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       spawnItem();
-      state.spawnTimer = spawnInterval * (0.6 + Math.random() * 0.8);
+      state.spawnTimer = spawnInterval * (0.3 + Math.random() * 1.5);
     }
 
     // Unicorn timing
@@ -575,11 +575,13 @@
   function showCountPanel() {
     state.countInput = '';
     countDisplay.textContent = '?';
+    scoreEl.classList.add('hidden');
     countPanel.classList.remove('hidden');
   }
 
   function hideCountPanel() {
     countPanel.classList.add('hidden');
+    scoreEl.classList.remove('hidden');
   }
 
   function appendDigit(d) {
