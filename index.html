@@ -95,6 +95,107 @@
   }
   #lives { left: 0; }
   #score { right: 0; }
+
+  .unicorn-says {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 22px;
+    animation: unicornBounce 1.4s ease-in-out infinite;
+  }
+  @keyframes unicornBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    color: #2a1454;
+    padding: 14px 20px;
+    border-radius: 22px;
+    font-weight: 700;
+    font-size: clamp(18px, 5vw, 24px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    max-width: 70vw;
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 55%;
+    transform: translateY(-50%);
+    border: 10px solid transparent;
+    border-left-color: #fff;
+    border-right: 0;
+  }
+  .unicorn-icon {
+    font-size: clamp(64px, 18vw, 120px);
+    filter: drop-shadow(0 4px 14px rgba(255, 122, 217, 0.5));
+    line-height: 1;
+  }
+
+  #countPanel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0));
+    background: linear-gradient(180deg, rgba(5,7,26,0.6) 0%, rgba(5,7,26,0.95) 30%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .count-question {
+    font-size: clamp(15px, 4.4vw, 20px);
+    font-weight: 700;
+    text-align: center;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  }
+  .count-display {
+    background: #fff;
+    color: #2a1454;
+    font-size: clamp(28px, 8vw, 40px);
+    font-weight: 800;
+    padding: 4px 22px;
+    min-width: 110px;
+    border-radius: 14px;
+    text-align: center;
+    letter-spacing: 4px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: min(300px, 92vw);
+  }
+  .num-btn {
+    aspect-ratio: 2 / 1;
+    font-size: clamp(20px, 6vw, 26px);
+    font-weight: 800;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffe27a, #ff7ad9);
+    color: #1a0033;
+    box-shadow: 0 4px 12px rgba(255, 122, 217, 0.35);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .num-btn:active { transform: scale(0.94); }
+  .num-btn.zero { grid-column: 2; }
+  .num-btn.action {
+    background: linear-gradient(135deg, #7ad9ff, #b48cff);
+    color: #fff;
+  }
+  .num-btn.ok {
+    background: linear-gradient(135deg, #7ee787, #3aa07c);
+    color: #04210f;
+  }
 </style>
 </head>
 <body>
@@ -107,14 +208,38 @@
   <p>Tippe fallende <b>Sternschnuppen</b> ⭐ an, bevor sie unten ankommen.</p>
   <p>Nicht antippen: 🏀 Bälle, 💧 Regentropfen, 🍕 Essensreste.</p>
   <p>Tippe das 🦄 Einhorn für ein Extraleben!</p>
+  <p>Alle 20 Sekunden: <b>zähle deine Sternschnuppen</b> und tippe die Zahl ein.</p>
   <div class="legend">3 Leben · Wird mit der Zeit schneller</div>
   <button id="startBtn" class="btn">Spiel starten</button>
 </div>
 
 <div id="endScreen" class="overlay hidden">
+  <div class="unicorn-says">
+    <div class="speech-bubble">Komm, versuch's nochmal!</div>
+    <div class="unicorn-icon">🦄</div>
+  </div>
   <h1>Game Over</h1>
   <p id="finalScore">Du hast 0 Sternschnuppen gefangen.</p>
   <button id="restartBtn" class="btn">Nochmal spielen</button>
+</div>
+
+<div id="countPanel" class="hidden">
+  <div class="count-question">Wie viele Sternschnuppen siehst du?</div>
+  <div id="countDisplay" class="count-display">?</div>
+  <div class="numpad">
+    <button class="num-btn" data-digit="1">1</button>
+    <button class="num-btn" data-digit="2">2</button>
+    <button class="num-btn" data-digit="3">3</button>
+    <button class="num-btn" data-digit="4">4</button>
+    <button class="num-btn" data-digit="5">5</button>
+    <button class="num-btn" data-digit="6">6</button>
+    <button class="num-btn" data-digit="7">7</button>
+    <button class="num-btn" data-digit="8">8</button>
+    <button class="num-btn" data-digit="9">9</button>
+    <button class="num-btn action" id="countClear">←</button>
+    <button class="num-btn zero" data-digit="0">0</button>
+    <button class="num-btn ok" id="countOk">OK</button>
+  </div>
 </div>
 
 <script>
@@ -128,6 +253,8 @@
   const startBtn = document.getElementById('startBtn');
   const restartBtn = document.getElementById('restartBtn');
   const finalScore = document.getElementById('finalScore');
+  const countPanel = document.getElementById('countPanel');
+  const countDisplay = document.getElementById('countDisplay');
 
   let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   let W = 0, H = 0;
@@ -146,6 +273,8 @@
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', resize);
 
+  const ROUND_SECONDS = 20;
+
   const state = {
     running: false,
     lives: 3,
@@ -158,6 +287,11 @@
     elapsed: 0,
     spawnTimer: 0,
     unicornTimer: 8 + Math.random() * 8,
+    roundCaught: 0,
+    roundTimer: ROUND_SECONDS,
+    phase: 'playing', // 'playing' | 'flyingUp' | 'counting'
+    flyStars: [],
+    countInput: '',
   };
 
   function initBgStars() {
@@ -188,6 +322,12 @@
     state.elapsed = 0;
     state.spawnTimer = 0;
     state.unicornTimer = 8 + Math.random() * 8;
+    state.roundCaught = 0;
+    state.roundTimer = ROUND_SECONDS;
+    state.phase = 'playing';
+    state.flyStars = [];
+    state.countInput = '';
+    hideCountPanel();
     updateHUD();
   }
 
@@ -215,15 +355,15 @@
 
   function spawnItem() {
     const t = state.elapsed;
-    // Probability of bad item rises a bit over time, capped ~55%
-    const badChance = Math.min(0.55, 0.30 + t / 240);
+    // Easier at start: starts at ~15% bad, climbs to ~55% over time
+    const badChance = Math.min(0.55, 0.15 + t / 220);
     const isBad = Math.random() < badChance;
     const type = isBad ? BAD_TYPES[Math.floor(Math.random() * BAD_TYPES.length)] : 'star';
 
     const size = type === 'star' ? 42 + Math.random() * 14 : 38 + Math.random() * 14;
-    // Speed grows over time
-    const baseMin = 110 + t * 3.5;
-    const baseMax = 220 + t * 6;
+    // Slower at start; grows over time
+    const baseMin = 80 + t * 3.0;
+    const baseMax = 160 + t * 5.5;
     const speed = baseMin + Math.random() * (baseMax - baseMin);
 
     const x = size + Math.random() * (W - size * 2);
@@ -261,17 +401,28 @@
     if (!state.running) return;
     const dt = Math.min(0.05, (now - state.lastTime) / 1000);
     state.lastTime = now;
-    state.elapsed += dt;
 
-    update(dt);
+    if (state.phase === 'playing') {
+      state.elapsed += dt;
+      state.roundTimer -= dt;
+      update(dt);
+      if (state.roundTimer <= 0) startFlyingPhase();
+    } else if (state.phase === 'flyingUp') {
+      updateFlying(dt);
+      updatePops(dt);
+    } else if (state.phase === 'counting') {
+      updateFlyingIdle(dt);
+      updatePops(dt);
+    }
+
     render();
 
     requestAnimationFrame(loop);
   }
 
   function update(dt) {
-    // Spawn rate increases over time
-    const spawnInterval = Math.max(0.32, 1.25 - state.elapsed * 0.012);
+    // Spawn rate increases over time. Slower start: 1.6s -> ~0.32s.
+    const spawnInterval = Math.max(0.32, 1.6 - state.elapsed * 0.013);
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       spawnItem();
@@ -324,17 +475,154 @@
       }
     }
 
-    // Pop effects
-    for (let i = state.pops.length - 1; i >= 0; i--) {
-      const p = state.pops[i];
-      p.t += dt;
-      if (p.t > p.life) state.pops.splice(i, 1);
-    }
+    updatePops(dt);
 
     // Background stars twinkle
     for (const s of state.bgStars) {
       s.tw += dt * 2;
     }
+  }
+
+  function updatePops(dt) {
+    for (let i = state.pops.length - 1; i >= 0; i--) {
+      const p = state.pops[i];
+      p.t += dt;
+      if (p.t > p.life) state.pops.splice(i, 1);
+    }
+  }
+
+  function startFlyingPhase() {
+    state.phase = 'flyingUp';
+    // Clear remaining falling items so they don't interfere with counting
+    state.items = [];
+    state.unicorn = null;
+    state.flyStars = [];
+
+    const count = state.roundCaught;
+    if (count === 0) {
+      state.phase = 'counting';
+      showCountPanel();
+      return;
+    }
+
+    // Layout target positions in a loose grid in the upper area.
+    const cols = Math.max(1, Math.min(count, Math.ceil(Math.sqrt(count * 1.6))));
+    const rows = Math.ceil(count / cols);
+    const areaW = Math.min(W * 0.92, 560);
+    const areaH = Math.min(H * 0.40, 320);
+    const offX = (W - areaW) / 2;
+    const offY = H * 0.08;
+    const cellW = areaW / cols;
+    const cellH = areaH / rows;
+    const starSize = Math.max(20, Math.min(38, 200 / Math.sqrt(count + 1)));
+
+    const bw = Math.min(W * 0.85, 520);
+    const bx = (W - bw) / 2;
+    const basketTop = H - 70 + 20 - 8;
+
+    for (let i = 0; i < count; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      const tx = offX + cellW * (c + 0.5) + (Math.random() - 0.5) * cellW * 0.3;
+      const ty = offY + cellH * (r + 0.5) + (Math.random() - 0.5) * cellH * 0.25;
+      const startX = bx + 30 + Math.random() * (bw - 60);
+      const startY = basketTop - Math.random() * 8;
+      state.flyStars.push({
+        startX, startY,
+        x: startX, y: startY,
+        tx, ty,
+        size: starSize,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 1.6,
+        glow: Math.random() * Math.PI * 2,
+        delay: i * 0.05,
+        t: 0,
+      });
+    }
+  }
+
+  function updateFlying(dt) {
+    let allDone = true;
+    const dur = 0.95;
+    for (const s of state.flyStars) {
+      s.t += dt;
+      const local = Math.max(0, s.t - s.delay);
+      if (local < dur) allDone = false;
+      const k = Math.min(1, local / dur);
+      const ek = 1 - Math.pow(1 - k, 3);
+      s.x = s.startX + (s.tx - s.startX) * ek;
+      s.y = s.startY + (s.ty - s.startY) * ek - Math.sin(k * Math.PI) * 50;
+      s.rot += s.vr * dt;
+      s.glow += dt * 4;
+    }
+    if (allDone) {
+      // Snap to final positions and switch
+      for (const s of state.flyStars) { s.x = s.tx; s.y = s.ty; }
+      state.phase = 'counting';
+      showCountPanel();
+    }
+  }
+
+  function updateFlyingIdle(dt) {
+    for (const s of state.flyStars) {
+      s.glow += dt * 3;
+      s.rot += s.vr * dt * 0.25;
+      // Gentle bobbing in place
+      s.y = s.ty + Math.sin(s.glow * 0.6 + s.delay * 7) * 2;
+    }
+  }
+
+  function showCountPanel() {
+    state.countInput = '';
+    countDisplay.textContent = '?';
+    countPanel.classList.remove('hidden');
+  }
+
+  function hideCountPanel() {
+    countPanel.classList.add('hidden');
+  }
+
+  function appendDigit(d) {
+    if (state.countInput.length >= 2) return;
+    if (state.countInput === '0') state.countInput = '';
+    state.countInput += d;
+    countDisplay.textContent = state.countInput;
+  }
+
+  function clearDigit() {
+    state.countInput = state.countInput.slice(0, -1);
+    countDisplay.textContent = state.countInput || '?';
+  }
+
+  function submitCount() {
+    if (state.countInput === '') return;
+    const guess = parseInt(state.countInput, 10);
+    const actual = state.roundCaught;
+    hideCountPanel();
+    if (guess === actual) {
+      addPop(W / 2, H * 0.55, '#a8ffd5', `Richtig! ${actual} ⭐`);
+      flashScreen('rgba(120, 255, 180, 0.3)');
+      resumePlaying();
+    } else {
+      addPop(W / 2, H * 0.55, '#ff7a8a', `Es waren ${actual}`);
+      state.lives--;
+      updateHUD();
+      flashScreen('rgba(255, 60, 80, 0.35)');
+      if (state.lives <= 0) {
+        state.flyStars = [];
+        endGame();
+      } else {
+        resumePlaying();
+      }
+    }
+  }
+
+  function resumePlaying() {
+    state.flyStars = [];
+    state.roundCaught = 0;
+    state.roundTimer = ROUND_SECONDS;
+    state.spawnTimer = 0.8;
+    state.phase = 'playing';
   }
 
   function loseLife() {
@@ -366,6 +654,7 @@
   // INPUT
   function handleTap(x, y) {
     if (!state.running) return;
+    if (state.phase !== 'playing') return;
     // Unicorn first (drawn on top)
     if (state.unicorn && !state.unicorn.tapped) {
       const u = state.unicorn;
@@ -393,6 +682,7 @@
           it.vy = Math.max(it.vy, 320);
           it.vx = (Math.random() - 0.5) * 80;
           state.score++;
+          state.roundCaught++;
           updateHUD();
           addPop(it.x, it.y, '#ffe27a', '+1 ⭐');
         } else {
@@ -419,6 +709,16 @@
     handleTap(e.clientX - rect.left, e.clientY - rect.top);
   });
 
+  // Numpad
+  countPanel.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.id === 'countOk') { submitCount(); return; }
+    if (t.id === 'countClear') { clearDigit(); return; }
+    const d = t.getAttribute('data-digit');
+    if (d != null) appendDigit(d);
+  });
+
   // RENDER
   function render() {
     ctx.clearRect(0, 0, W, H);
@@ -440,6 +740,11 @@
     // Items
     for (const it of state.items) {
       drawItem(it);
+    }
+
+    // Flying / counted stars
+    for (const s of state.flyStars) {
+      drawCountStar(s);
     }
 
     // Unicorn
@@ -566,6 +871,32 @@
     ctx.beginPath();
     ctx.arc(-s * 0.1, -s * 0.1, s * 0.08, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  function drawCountStar(s) {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    const size = s.size;
+    const glow = 0.6 + 0.4 * Math.sin(s.glow);
+    const halo = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size * 1.2);
+    halo.addColorStop(0, `rgba(255, 240, 180, ${0.55 * glow})`);
+    halo.addColorStop(1, 'rgba(255, 240, 180, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff4b8';
+    ctx.strokeStyle = '#f5c542';
+    ctx.lineWidth = 2;
+    starPath(size * 0.55, size * 0.25, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-size * 0.1, -size * 0.1, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function starPath(outer, inner, points) {
